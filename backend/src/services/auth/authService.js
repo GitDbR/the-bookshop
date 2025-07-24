@@ -1,19 +1,21 @@
 const bcrypt = require('bcryptjs');
-const User = require('../../models/Users');
 require('dotenv').config();
-const jwt = require('jsonwebtoken')
+const jwt = require('jsonwebtoken');
+const User = require('../../models/Users');
+const Order = require('../../models/Order');
+const OrCartItemder = require('../../models/Order');
+
 
 const createUser = async (userData) => {
     try {
-        const email = userData.email;
-        const password = userData.password;
-        const firstName = userData.firstName;
-        const lastName = userData.lastName;
-        const exsistingUser = await User.findOne({ email: email })
+        const { email, password, firstName, lastName } = userData;
 
-        if (exsistingUser) {
-            throw new error(`User already exsist!`);
-        };
+        const existingUser = await User.findOne({ email });
+
+        if (existingUser) {
+            throw new Error('User already exists!');
+        }
+
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const user = new User({
@@ -23,35 +25,47 @@ const createUser = async (userData) => {
             role: 'CUSTOMER',
             password: hashedPassword
         });
+
+        const order = new Order({
+            amount: 0,
+            address: "Default address",
+            orderStatus: "PENDING",
+            user: user,
+        });
+        await order.save();
         await user.save();
-        return user
+        return user;
     } catch (error) {
-        console.log(`Error creating user: ${error}`);
+        console.log('Error creating user:', error.message);
+        throw error;
     }
 };
 
 const loginUser = async (userData) => {
     try {
-        const email = userData.email;
-        const password = userData.password;
+        const { email, password } = userData;
 
-        const exsistingUser = await User.findOne({ email: email })
+        const existingUser = await User.findOne({ email });
 
-        if (!exsistingUser) {
-            throw new error(`User not exsist!`);
-        };
-        const isPasswordValid = await bcrypt.compare(password, exsistingUser.password);
+        if (!existingUser) {
+            throw new Error('User does not exist!');
+        }
+
+        const isPasswordValid = await bcrypt.compare(password, existingUser.password);
         if (!isPasswordValid) {
-            throw new error(`Invalid Password!`);
-        };
+            throw new Error('Invalid password!');
+        }
 
-        const token = jwt.sign({ id: exsistingUser._id, role: exsistingUser.role },
-            process.env.JWT_SERECT,
-            { expiresIn: '1d' })
+        const token = jwt.sign(
+            { id: existingUser._id, role: existingUser.role },
+            process.env.JWT_SECRETE, 
+            { expiresIn: '1d' }
+        );
 
         return token;
     } catch (error) {
-        console.log(`Error creating user: ${error}`);
+        console.log(`Error logging in user: ${error.message}`);
+        throw error;
     }
 };
 
